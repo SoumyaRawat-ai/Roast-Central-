@@ -21,6 +21,7 @@ export default function Home() {
   const [voiceStyle, setVoiceStyle] = useState<'sarcastic guy' | 'rude grandma' | 'British villain'>('sarcastic guy');
   const {toast} = useToast();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isImageLoading, setIsImageLoading] = useState(false);
 
 
   const handleRoast = async () => {
@@ -66,14 +67,27 @@ export default function Home() {
     });
   };
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
 
     if (file) {
+      setIsImageLoading(true);
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setSelectedImage(reader.result as string);
+
+      reader.onload = (e) => {
+        setSelectedImage(e.target?.result as string);
+        setIsImageLoading(false);
       };
+
+      reader.onerror = () => {
+        toast({
+          title: 'Error',
+          description: 'Failed to read the image.',
+          variant: 'destructive',
+        });
+        setIsImageLoading(false);
+      };
+
       reader.readAsDataURL(file);
     }
   };
@@ -92,13 +106,13 @@ export default function Home() {
           <div className="flex items-center space-x-4">
             <Avatar>
               {selectedImage ? (
-                <AvatarImage src={selectedImage} alt="Uploaded Image" />
+                <AvatarImage src={selectedImage} alt="Uploaded Image" onLoad={() => setIsImageLoading(false)} />
               ) : (
-                <>
-                  <AvatarImage src="https://picsum.photos/50/50" alt="Profile Image" />
-                  <AvatarFallback>RC</AvatarFallback>
-                </>
+                <AvatarImage src="https://picsum.photos/50/50" alt="Profile Image" />
               )}
+              <AvatarFallback>
+                  {isImageLoading ? 'Loading...' : 'RC'}
+                </AvatarFallback>
             </Avatar>
             <div>
               <Input type="file" className="hidden" id="profile-image" onChange={handleImageUpload}/>
