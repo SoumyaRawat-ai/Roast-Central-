@@ -20,6 +20,8 @@ export default function Home() {
   const [voiceRoast, setVoiceRoast] = useState('');
   const [voiceStyle, setVoiceStyle] = useState<'sarcastic guy' | 'rude grandma' | 'British villain'>('sarcastic guy');
   const {toast} = useToast();
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+
 
   const handleRoast = async () => {
     if (!bio) {
@@ -64,6 +66,18 @@ export default function Home() {
     });
   };
 
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSelectedImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   return (
     <div className="flex flex-col items-center justify-start min-h-screen bg-background p-4">
       <h1 className="text-3xl font-bold mb-6 text-foreground">Roast Central</h1>
@@ -77,11 +91,17 @@ export default function Home() {
         <CardContent className="grid gap-4">
           <div className="flex items-center space-x-4">
             <Avatar>
-              <AvatarImage src="https://picsum.photos/50/50" alt="Profile Image"/>
-              <AvatarFallback>RC</AvatarFallback>
+              {selectedImage ? (
+                <AvatarImage src={selectedImage} alt="Uploaded Image" />
+              ) : (
+                <>
+                  <AvatarImage src="https://picsum.photos/50/50" alt="Profile Image" />
+                  <AvatarFallback>RC</AvatarFallback>
+                </>
+              )}
             </Avatar>
             <div>
-              <Input type="file" className="hidden" id="profile-image"/>
+              <Input type="file" className="hidden" id="profile-image" onChange={handleImageUpload}/>
               <label htmlFor="profile-image">
                 <Button variant="outline" size="sm">
                   Upload Photo
