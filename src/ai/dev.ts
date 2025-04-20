@@ -1,1 +1,2 @@
-// Flows will be imported for their side effects in this file.
+import '@/ai/flows/generate-voice-roast.ts';
+import '@/ai/flows/generate-roast-from-bio.ts';
