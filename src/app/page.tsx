@@ -1,6 +1,9 @@
 'use client';
 
 import {useState} from 'react';
+import {useForm} from 'react-hook-form';
+import {zodResolver} from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import {
   Avatar,
   AvatarFallback,
@@ -13,19 +16,52 @@ import {Textarea} from '@/components/ui/textarea';
 import {useToast} from '@/hooks/use-toast';
 import {generateRoastFromBio} from '@/ai/flows/generate-roast-from-bio';
 import {generateVoiceRoastWrapper} from '@/ai/flows/generate-voice-roast';
+import {RadioGroup, RadioGroupItem} from '@/components/ui/radio-group';
+import {Label} from '@/components/ui/label';
+import {icons} from '@/components/icons';
+
+const voiceStyles = [
+  {
+    value: 'sarcastic guy',
+    label: 'Sarcastic Guy',
+  },
+  {
+    value: 'rude grandma',
+    label: 'Rude Grandma',
+  },
+  {
+    value: 'British villain',
+    label: 'British Villain',
+  },
+];
+
+const formSchema = z.object({
+  bio: z.string().min(10, {
+    message: 'Bio must be at least 10 characters.',
+  }),
+  image: z.string().optional(),
+});
+
+type VoiceStyle = (typeof voiceStyles)[number]['value'];
 
 export default function Home() {
-  const [bio, setBio] = useState('');
   const [roast, setRoast] = useState('');
   const [voiceRoast, setVoiceRoast] = useState('');
-  const [voiceStyle, setVoiceStyle] = useState<'sarcastic guy' | 'rude grandma' | 'British villain'>('sarcastic guy');
   const {toast} = useToast();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isImageLoading, setIsImageLoading] = useState(false);
+  const [voiceStyle, setVoiceStyle] = useState<VoiceStyle>('sarcastic guy');
 
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      bio: '',
+      image: '',
+    },
+  });
 
-  const handleRoast = async () => {
-    if (!bio) {
+  const handleRoast = async (values: z.infer<typeof formSchema>) => {
+    if (!values.bio) {
       toast({
         title: 'Error',
         description: 'Please enter a bio to generate a roast.',
@@ -34,7 +70,7 @@ export default function Home() {
       return;
     }
 
-    const roastResult = await generateRoastFromBio({bio});
+    const roastResult = await generateRoastFromBio({bio: values.bio});
     setRoast(roastResult.roast);
   };
 
@@ -77,6 +113,7 @@ export default function Home() {
       reader.onload = (e) => {
         setSelectedImage(e.target?.result as string);
         setIsImageLoading(false);
+        form.setValue('image', e.target?.result as string);
       };
 
       reader.onerror = () => {
@@ -106,16 +143,16 @@ export default function Home() {
           <div className="flex items-center space-x-4">
             <Avatar>
               {selectedImage ? (
-                <AvatarImage src={selectedImage} alt="Uploaded Image"  onLoad={() => setIsImageLoading(false)}/>
+                <AvatarImage src={selectedImage} alt="Uploaded Image" onLoad={() => setIsImageLoading(false)} />
               ) : (
                 <AvatarImage src="https://picsum.photos/50/50" alt="Profile Image" />
               )}
               <AvatarFallback>
-                  {isImageLoading ? 'Loading...' : 'RC'}
-                </AvatarFallback>
+                {isImageLoading ? 'Loading...' : 'RC'}
+              </AvatarFallback>
             </Avatar>
             <div>
-              <Input type="file" className="hidden" id="profile-image" onChange={handleImageUpload}/>
+              <Input type="file" className="hidden" id="profile-image" onChange={handleImageUpload} />
               <label htmlFor="profile-image">
                 <Button variant="outline" size="sm">
                   Upload Photo
@@ -126,14 +163,13 @@ export default function Home() {
           <div>
             <Textarea
               placeholder="Write your bio here..."
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
+              {...form.register('bio')}
             />
           </div>
         </CardContent>
         <CardFooter>
-          <Button className="bg-orange-500 text-white hover:bg-orange-600" onClick={handleRoast}>
-            Get Roasted! 🔥
+          <Button onClick={form.handleSubmit(handleRoast)}>
+            Get Roasted! {icons.fire}
           </Button>
         </CardFooter>
       </Card>
@@ -178,15 +214,14 @@ export default function Home() {
             <CardDescription>Hear your roast in different voices.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
-            <select
-              className="w-full p-2 border rounded"
-              value={voiceStyle}
-              onChange={(e) => setVoiceStyle(e.target.value as 'sarcastic guy' | 'rude grandma' | 'British villain')}
-            >
-              <option value="sarcastic guy">Sarcastic Guy</option>
-              <option value="rude grandma">Rude Grandma</option>
-              <option value="British villain">British Villain</option>
-            </select>
+            <RadioGroup defaultValue={voiceStyle} onValueChange={setVoiceStyle} className="flex flex-col space-y-1">
+              {voiceStyles.map(style => (
+                <div key={style.value} className="flex items-center space-x-2">
+                  <RadioGroupItem value={style.value} id={style.value} />
+                  <Label htmlFor={style.value}>{style.label}</Label>
+                </div>
+              ))}
+            </RadioGroup>
             <Button onClick={handleVoiceRoast}>Generate Voice Roast</Button>
             {voiceRoast ? (
               <audio controls src={`data:audio/mp3;base64,${voiceRoast}`}></audio>
