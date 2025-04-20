@@ -106,7 +106,7 @@ export default function Home() {
           <div className="flex items-center space-x-4">
             <Avatar>
               {selectedImage ? (
-                <AvatarImage src={selectedImage} alt="Uploaded Image" onLoad={() => setIsImageLoading(false)} />
+                <AvatarImage src={selectedImage} alt="Uploaded Image"  onLoad={() => setIsImageLoading(false)}/>
               ) : (
                 <AvatarImage src="https://picsum.photos/50/50" alt="Profile Image" />
               )}
