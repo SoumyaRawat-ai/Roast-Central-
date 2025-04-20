@@ -1,6 +1,6 @@
 'use client';
 
-import {useState} from 'react';
+import {useState, useEffect} from 'react';
 import {useForm} from 'react-hook-form';
 import {zodResolver} from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -51,6 +51,33 @@ export default function Home() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isImageLoading, setIsImageLoading] = useState(false);
   const [voiceStyle, setVoiceStyle] = useState<VoiceStyle>('sarcastic guy');
+  const [isVoiceLoading, setIsVoiceLoading] = useState(false); 
+  const [receivedRoastsCount, setReceivedRoastsCount] = useState(0);
+  const [givenRoastsCount, setGivenRoastsCount] = useState(0);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // const response = await fetch('/api/user/profile');
+        // if (!response.ok) {
+        //   throw new Error('Failed to fetch roast counts');
+        // }
+        // const data = await response.json(); 
+        // setReceivedRoastsCount(data.receivedRoasts); 
+        // setGivenRoastsCount(data.givenRoasts); 
+        setReceivedRoastsCount(10);
+        setGivenRoastsCount(5);
+      } catch (error) {
+        console.error('Error fetching roast counts:', error);
+        toast({ 
+          title: 'Error',
+          description: 'Failed to load profile stats.',
+          variant: 'destructive',
+        });
+      }
+    };
+    fetchData();
+  }, [toast]); 
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -75,7 +102,9 @@ export default function Home() {
   };
 
   const handleVoiceRoast = async () => {
+    console.log("handleVoiceRoast triggered");
     if (!roast) {
+      console.log("No roast text available");
       toast({
         title: 'Error',
         description: 'Please generate a roast first.',
@@ -84,8 +113,37 @@ export default function Home() {
       return;
     }
 
-    const voiceRoastResult = await generateVoiceRoastWrapper({text: roast, voiceStyle: voiceStyle});
-    setVoiceRoast(voiceRoastResult.audio);
+    setIsVoiceLoading(true); 
+    setVoiceRoast(''); 
+    console.log(`Calling generateVoiceRoastWrapper with style: ${voiceStyle}`);
+
+    try {
+      const voiceRoastResult = await generateVoiceRoastWrapper({text: roast, voiceStyle: voiceStyle});
+      console.log("generateVoiceRoastWrapper returned:", voiceRoastResult);
+
+      if (voiceRoastResult && voiceRoastResult.audio) {
+        console.log("Audio base64 received (length:", voiceRoastResult.audio.length, ", first 50 chars):", voiceRoastResult.audio.substring(0, 50) + '...'); 
+        setVoiceRoast(voiceRoastResult.audio);
+        console.log("voiceRoast state updated");
+      } else {
+        console.error("Invalid response from generateVoiceRoastWrapper:", voiceRoastResult);
+        toast({
+          title: 'Error',
+          description: 'Failed to generate voice roast. Invalid response received.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      console.error("Error calling generateVoiceRoastWrapper:", error);
+      toast({
+        title: 'Error',
+        description: `Failed to generate voice roast: ${error.message}`,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsVoiceLoading(false); 
+      console.log("handleVoiceRoast finished");
+    }
   };
 
   const handleReaction = (reaction: string) => {
@@ -95,28 +153,77 @@ export default function Home() {
     });
   };
 
-  const shareRoast = () => {
-    // Logic for sharing the roast
-    toast({
-      title: 'Share',
-      description: 'Roast shared successfully!',
-    });
+  // Updated shareRoast function
+  const shareRoast = async () => {
+    if (!roast) {
+      toast({
+        title: 'Error',
+        description: 'Generate a roast first before sharing.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const shareData = {
+      title: 'Check out my roast!',
+      text: roast,
+      url: window.location.href, // Share the current page URL
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+        toast({
+          title: 'Shared!',
+          description: 'Roast shared successfully using Web Share.',
+        });
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(roast);
+        toast({
+          title: 'Copied!',
+          description: 'Roast copied to clipboard.',
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Sharing and copying not supported on this browser.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error sharing roast:', error);
+      // Avoid showing toast if the user simply cancelled the share action
+      if ((error as Error).name !== 'AbortError') {
+        toast({
+          title: 'Error',
+          description: 'Failed to share or copy roast.',
+          variant: 'destructive',
+        });
+      }
+    }
   };
 
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+ const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log("handleImageUpload triggered");
     const file = event.target.files?.[0];
 
     if (file) {
+      console.log("File selected:", file.name);
       setIsImageLoading(true);
       const reader = new FileReader();
 
       reader.onload = (e) => {
-        setSelectedImage(e.target?.result as string);
+        console.log("FileReader onload triggered");
+        const result = e.target?.result as string;
+        console.log("Image loaded as Data URL (first 50 chars):", result ? result.substring(0, 50) + '...' : 'null/undefined'); 
+        setSelectedImage(result);
         setIsImageLoading(false);
-        form.setValue('image', e.target?.result as string);
+        form.setValue('image', result);
+        console.log("State and form updated");
       };
 
-      reader.onerror = () => {
+      reader.onerror = (error) => { 
+        console.error("FileReader onerror triggered:", error);
         toast({
           title: 'Error',
           description: 'Failed to read the image.',
@@ -126,6 +233,9 @@ export default function Home() {
       };
 
       reader.readAsDataURL(file);
+      console.log("FileReader readAsDataURL called");
+    } else {
+      console.log("No file selected or event.target.files is null/empty.");
     }
   };
 
@@ -143,19 +253,19 @@ export default function Home() {
           <div className="flex items-center space-x-4">
             <Avatar>
               {selectedImage ? (
-                <AvatarImage src={selectedImage} alt="Uploaded Image" onLoad={() => setIsImageLoading(false)} />
+                <AvatarImage src={selectedImage} alt="Uploaded Image" />
               ) : (
-                <AvatarImage src="https://picsum.photos/50/50" alt="Profile Image" />
+                <AvatarImage src="https://picsum.photos/50/50" alt="Profile Image" /> 
               )}
               <AvatarFallback>
-                {isImageLoading ? 'Loading...' : 'RC'}
+                {isImageLoading ? '...' : 'RC'}
               </AvatarFallback>
             </Avatar>
             <div>
-              <Input type="file" className="hidden" id="profile-image" onChange={handleImageUpload} />
+              <Input type="file" className="hidden" id="profile-image" onChange={handleImageUpload} accept="image/*"/>
               <label htmlFor="profile-image">
-                <Button variant="outline" size="sm">
-                  Upload Photo
+                <Button variant="outline" size="sm" asChild>
+                 <span>Upload Photo</span>
                 </Button>
               </label>
             </div>
@@ -168,8 +278,8 @@ export default function Home() {
           </div>
         </CardContent>
         <CardFooter>
-          <Button onClick={form.handleSubmit(handleRoast)}>
-            Get Roasted! {icons.fire}
+          <Button onClick={form.handleSubmit(handleRoast)} className="hover:bg-orange-500 hover:text-white">
+            Get Roasted! 🔥
           </Button>
         </CardFooter>
       </Card>
@@ -199,6 +309,7 @@ export default function Home() {
                 🗑️
               </Button>
             </div>
+            {/* The Share button calls the updated shareRoast function */}
             <Button variant="outline" size="sm" onClick={shareRoast}>
               Share
             </Button>
@@ -222,25 +333,32 @@ export default function Home() {
                 </div>
               ))}
             </RadioGroup>
-            <Button onClick={handleVoiceRoast}>Generate Voice Roast</Button>
-            {voiceRoast ? (
-              <audio controls src={`data:audio/mp3;base64,${voiceRoast}`}></audio>
+            <Button onClick={handleVoiceRoast} className="hover:bg-orange-500 hover:text-white" disabled={isVoiceLoading}>
+              {isVoiceLoading ? (
+                <><icons.loader className="mr-2 h-4 w-4 animate-spin" /> Generating...</>
+              ) : (
+                'Generate Voice Roast'
+              )}
+            </Button>
+            {isVoiceLoading && <p>Generating voice roast...</p>}
+            {!isVoiceLoading && voiceRoast ? (
+              <audio controls src={`data:audio/mpeg;base64,${voiceRoast}`}></audio>
             ) : (
-              <p>No voice roast generated yet.</p>
+              !isVoiceLoading && <p>No voice roast generated yet.</p> 
             )}
           </CardContent>
         </Card>
       )}
 
-      {/* User Profile (Simplified) */}
+      {/* User Profile - Counts driven by state */} 
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Your Profile</CardTitle>
           <CardDescription>See your received roasts and stats.</CardDescription>
         </CardHeader>
         <CardContent>
-          <p>Received Roasts: 0</p>
-          <p>Given Roasts: 0</p>
+          <p>Received Roasts: {receivedRoastsCount}</p>
+          <p>Given Roasts: {givenRoastsCount}</p>
         </CardContent>
       </Card>
     </div>
